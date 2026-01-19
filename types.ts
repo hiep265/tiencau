@@ -23,6 +23,7 @@ export interface BadmintonSession {
     water: boolean;
     shuttle: boolean;
   };
+  participants: string[]; // Danh sách người tham gia buổi chơi
   note?: string;
 }
 

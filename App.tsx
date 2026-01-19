@@ -101,27 +101,57 @@ const App: React.FC = () => {
   const totalFund = useMemo(() => {
     return data.fundTransactions.reduce((acc, curr) => {
       if (curr.type === 'CONTRIBUTION') return acc + curr.amount;
-      if ((curr.type === 'PREPAID_PURCHASE' || curr.type === 'EXPENSE') && curr.payer === 'Quỹ') {
-        return acc - curr.amount;
-      }
+      // Trừ tiền mua trả trước (dù Quỹ hay thành viên mua đều tính là chi của quỹ)
+      if (curr.type === 'PREPAID_PURCHASE') return acc - curr.amount;
+      // Chi phí buổi chơi từ Quỹ
+      if (curr.type === 'EXPENSE' && curr.payer === 'Quỹ') return acc - curr.amount;
       return acc;
     }, 0);
   }, [data.fundTransactions]);
 
-  const memberDebts = useMemo(() => {
-    const debts: Record<string, number> = {};
-    data.members.forEach(p => debts[p] = 0);
-    data.sessions.forEach(s => {
-      if (s.payers.court !== 'Quỹ' && data.members.includes(s.payers.court)) debts[s.payers.court] += s.costs.court;
-      if (s.payers.water !== 'Quỹ' && data.members.includes(s.payers.water)) debts[s.payers.water] += s.costs.water;
-      if (s.payers.shuttle !== 'Quỹ' && data.members.includes(s.payers.shuttle)) debts[s.payers.shuttle] += s.costs.shuttle;
-    });
+  // Tính số dư cá nhân của mỗi thành viên
+  // Balance = Đóng góp + Tiền mua trả trước (nếu họ mua) - Phần chi phí chia đều
+  const memberBalances = useMemo(() => {
+    const balances: Record<string, number> = {};
+    data.members.forEach(p => balances[p] = 0);
+    const memberCount = data.members.length;
+
     data.fundTransactions.forEach(tx => {
-      if (tx.type === 'PREPAID_PURCHASE' && tx.payer !== 'Quỹ' && data.members.includes(tx.payer)) {
-        debts[tx.payer] += tx.amount;
+      // Cộng tiền đóng góp
+      if (tx.type === 'CONTRIBUTION' && data.members.includes(tx.payer)) {
+        balances[tx.payer] += tx.amount;
+      }
+
+      // Xử lý mua trả trước: chia đều chi phí cho tất cả thành viên
+      if (tx.type === 'PREPAID_PURCHASE' && memberCount > 0) {
+        // Nếu thành viên mua bằng tiền túi → họ được ghi nhận
+        if (tx.payer !== 'Quỹ' && data.members.includes(tx.payer)) {
+          balances[tx.payer] += tx.amount;
+        }
+        // Chia đều chi phí cho tất cả thành viên
+        const costPerPerson = tx.amount / memberCount;
+        data.members.forEach(member => {
+          balances[member] -= costPerPerson;
+        });
       }
     });
-    return debts;
+
+    // Trừ phần chi phí của mỗi người khi họ tham gia buổi chơi
+    data.sessions.forEach(s => {
+      const participants = s.participants || data.members; // Fallback cho data cũ
+      if (participants.length === 0) return;
+
+      const totalSessionCost = s.costs.court + s.costs.water + s.costs.shuttle;
+      const costPerPerson = totalSessionCost / participants.length;
+
+      participants.forEach(participant => {
+        if (data.members.includes(participant)) {
+          balances[participant] -= costPerPerson;
+        }
+      });
+    });
+
+    return balances;
   }, [data.sessions, data.members, data.fundTransactions]);
 
   // --- UI STATE ---
@@ -161,7 +191,7 @@ const App: React.FC = () => {
     if (session.payers.water === 'Quỹ' || session.isPrepaid.water) totalCashOut += session.costs.water;
     if (session.payers.shuttle === 'Quỹ' || session.isPrepaid.shuttle) totalCashOut += session.costs.shuttle;
 
-    const newTx: FundTransaction[] = totalCashOut > 0 ? [{
+    const newTx: FundTransaction = {
       id: `tx-session-${session.id}`,
       date: session.date,
       amount: totalCashOut,
@@ -169,13 +199,34 @@ const App: React.FC = () => {
       type: 'EXPENSE',
       description: `Chi ngày ${session.date}`,
       category: 'general'
-    }] : [];
+    };
 
-    updateAndSync({
-      ...data,
-      sessions: [session, ...data.sessions],
-      fundTransactions: [...newTx, ...data.fundTransactions]
-    });
+    // Kiểm tra xem đang thêm mới hay sửa
+    const isEditing = editingSession !== null;
+
+    if (isEditing) {
+      // Cập nhật session cũ
+      const updatedSessions = data.sessions.map(s => s.id === session.id ? session : s);
+      // Cập nhật hoặc xóa fund transaction tương ứng
+      let updatedFundTx = data.fundTransactions.filter(tx => tx.id !== `tx-session-${session.id}`);
+      if (totalCashOut > 0) {
+        updatedFundTx = [newTx, ...updatedFundTx];
+      }
+      updateAndSync({
+        ...data,
+        sessions: updatedSessions,
+        fundTransactions: updatedFundTx
+      });
+    } else {
+      // Thêm session mới
+      updateAndSync({
+        ...data,
+        sessions: [session, ...data.sessions],
+        fundTransactions: totalCashOut > 0 ? [newTx, ...data.fundTransactions] : data.fundTransactions
+      });
+    }
+
+    setEditingSession(null);
     setShowModal(null);
   };
 
@@ -186,6 +237,11 @@ const App: React.FC = () => {
       sessions: data.sessions.filter(s => s.id !== id),
       fundTransactions: data.fundTransactions.filter(tx => tx.id !== `tx-session-${id}`)
     });
+  };
+
+  const editSession = (session: BadmintonSession) => {
+    setEditingSession(session);
+    setShowModal('session');
   };
 
   const deleteFundTransaction = (id: string) => {
@@ -210,7 +266,7 @@ const App: React.FC = () => {
     setIsAnalyzing(true);
     try {
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
-      const prompt = `Phân tích quỹ cầu lông: Quỹ ${totalFund.toLocaleString()} VNĐ, Nợ: ${JSON.stringify(memberDebts)}. Trả lời vui vẻ, ngắn gọn bằng tiếng Việt.`;
+      const prompt = `Phân tích quỹ cầu lông: Quỹ ${totalFund.toLocaleString()} VNĐ, Nợ: ${JSON.stringify(memberBalances)}. Trả lời vui vẻ, ngắn gọn bằng tiếng Việt.`;
       const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
       setAiAnalysis(response.text || 'Không có phản hồi.');
     } catch (err) { setAiAnalysis('Lỗi AI.'); } finally { setIsAnalyzing(false); }
@@ -242,7 +298,7 @@ const App: React.FC = () => {
         {activeTab === 'summary' && (
           <SummaryView
             data={data}
-            memberDebts={memberDebts}
+            memberBalances={memberBalances}
             aiAnalysis={aiAnalysis}
             isAnalyzing={isAnalyzing}
             onAddMember={addMember}
@@ -251,7 +307,7 @@ const App: React.FC = () => {
             setDbConfig={setDbConfig}
           />
         )}
-        {activeTab === 'sessions' && <TransactionList items={data.sessions} type="session" onDelete={deleteSession} />}
+        {activeTab === 'sessions' && <TransactionList items={data.sessions} type="session" onEdit={editSession} onDelete={deleteSession} />}
         {activeTab === 'fund' && <TransactionList items={data.fundTransactions} type="fund" onDelete={deleteFundTransaction} />}
       </main>
 
@@ -287,10 +343,10 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100] animate-in fade-in backdrop-blur-sm">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Ghi buổi chơi mới</h2>
-              <button onClick={() => setShowModal(null)} className="text-slate-400 p-2">✕</button>
+              <h2 className="text-xl font-bold text-slate-800">{editingSession ? 'Sửa buổi chơi' : 'Ghi buổi chơi mới'}</h2>
+              <button onClick={() => { setShowModal(null); setEditingSession(null); }} className="text-slate-400 p-2">✕</button>
             </div>
-            <SessionForm members={data.members} onSubmit={addSession} />
+            <SessionForm initialData={editingSession || undefined} members={data.members} onSubmit={addSession} />
           </div>
         </div>
       )}

@@ -33,7 +33,7 @@ const TransactionList: React.FC<Props> = ({ items, type, onEdit, onDelete }) => 
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-black text-slate-700">-{total.toLocaleString()} VNĐ</span>
                     <div className="flex gap-1">
-                      <button 
+                      <button
                         onClick={() => onEdit?.(s)}
                         className="p-1.5 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-md transition-colors"
                         title="Sửa"
@@ -42,7 +42,7 @@ const TransactionList: React.FC<Props> = ({ items, type, onEdit, onDelete }) => 
                           <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                         </svg>
                       </button>
-                      <button 
+                      <button
                         onClick={() => onDelete?.(s.id)}
                         className="p-1.5 bg-slate-50 text-slate-400 hover:text-red-600 rounded-md transition-colors"
                         title="Xóa"
@@ -58,21 +58,28 @@ const TransactionList: React.FC<Props> = ({ items, type, onEdit, onDelete }) => 
                 <div className="grid grid-cols-1 gap-2 text-[10px] text-slate-500 font-medium border-t border-slate-50 pt-2 mt-2">
                   <div className="flex justify-between items-center">
                     <span className="flex items-center gap-1">
-                        Sân: <b className={s.isPrepaid.court ? 'text-blue-500' : 'text-slate-800'}>{s.costs.court.toLocaleString()} {s.isPrepaid.court && '(P)'}</b>
+                      Sân: <b className={s.isPrepaid.court ? 'text-blue-500' : 'text-slate-800'}>{s.costs.court.toLocaleString()} {s.isPrepaid.court && '(P)'}</b>
                     </span>
                     <span className="text-slate-400 italic">Người trả: {s.payers?.court || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="flex items-center gap-1">
-                        Nước: <b className={s.isPrepaid.water ? 'text-blue-500' : 'text-slate-800'}>{s.costs.water.toLocaleString()} {s.isPrepaid.water && '(P)'}</b>
+                      Nước: <b className={s.isPrepaid.water ? 'text-blue-500' : 'text-slate-800'}>{s.costs.water.toLocaleString()} {s.isPrepaid.water && '(P)'}</b>
                     </span>
                     <span className="text-slate-400 italic">Người trả: {s.payers?.water || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="flex items-center gap-1">
-                        Cầu: <b className={s.isPrepaid.shuttle ? 'text-blue-500' : 'text-slate-800'}>{s.costs.shuttle.toLocaleString()} {s.isPrepaid.shuttle && '(P)'}</b>
+                      Cầu: <b className={s.isPrepaid.shuttle ? 'text-blue-500' : 'text-slate-800'}>{s.costs.shuttle.toLocaleString()} {s.isPrepaid.shuttle && '(P)'}</b>
                     </span>
                     <span className="text-slate-400 italic">Người trả: {s.payers?.shuttle || 'N/A'}</span>
+                  </div>
+                  {/* Participants */}
+                  <div className="flex items-center gap-1 pt-1 border-t border-slate-50 mt-1">
+                    <span className="text-slate-400">👥 Tham gia:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {s.participants?.join(', ') || 'Tất cả'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -83,15 +90,14 @@ const TransactionList: React.FC<Props> = ({ items, type, onEdit, onDelete }) => 
             return (
               <div key={f.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center group">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-inner ${
-                    isPlus ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-inner ${isPlus ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                    }`}>
                     {isPlus ? '💰' : '💸'}
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{f.description}</p>
                     <p className="text-[10px] text-slate-400">
-                        {new Date(f.date).toLocaleDateString('vi-VN')} • Chi bởi: {f.payer || 'Quỹ'}
+                      {new Date(f.date).toLocaleDateString('vi-VN')} • Chi bởi: {f.payer || 'Quỹ'}
                     </p>
                   </div>
                 </div>
@@ -99,7 +105,7 @@ const TransactionList: React.FC<Props> = ({ items, type, onEdit, onDelete }) => 
                   <div className={`text-sm font-black ${isPlus ? 'text-emerald-600' : 'text-red-600'}`}>
                     {isPlus ? '+' : '-'}{f.amount.toLocaleString()}
                   </div>
-                  <button 
+                  <button
                     onClick={() => onDelete?.(f.id)}
                     className="p-1.5 bg-slate-50 text-slate-300 hover:text-red-500 rounded-md transition-colors opacity-0 group-hover:opacity-100 active:opacity-100"
                   >

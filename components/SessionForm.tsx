@@ -19,21 +19,35 @@ const SessionForm: React.FC<Props> = ({ initialData, members, onSubmit }) => {
   });
   const [isPrepaid, setIsPrepaid] = useState(initialData?.isPrepaid || { court: false, water: false, shuttle: false });
   const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+  const [participants, setParticipants] = useState<string[]>(initialData?.participants || members);
+
+  const toggleParticipant = (member: string) => {
+    setParticipants(prev =>
+      prev.includes(member)
+        ? prev.filter(p => p !== member)
+        : [...prev, member]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (participants.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 người tham gia!');
+      return;
+    }
     onSubmit({
       id: initialData?.id || crypto.randomUUID(),
       date,
       payers,
       costs: { court, water, shuttle },
-      isPrepaid
+      isPrepaid,
+      participants
     });
   };
 
   const PayerSelect = ({ value, onChange }: { value: Payer, onChange: (val: Payer) => void }) => (
-    <select 
-      value={value} 
+    <select
+      value={value}
       onChange={(e) => onChange(e.target.value)}
       className="bg-slate-100 border-none rounded-lg text-[11px] font-bold text-slate-700 p-1 focus:ring-1 focus:ring-indigo-500"
     >
@@ -46,37 +60,57 @@ const SessionForm: React.FC<Props> = ({ initialData, members, onSubmit }) => {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">Ngày chơi</label>
-        <input 
-          type="date" 
-          value={date} 
+        <input
+          type="date"
+          value={date}
           onChange={e => setDate(e.target.value)}
           className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
         />
       </div>
 
+      {/* Participants Selection */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">Người tham gia ({participants.length}/{members.length})</label>
+        <div className="flex flex-wrap gap-2">
+          {members.map(member => (
+            <button
+              key={member}
+              type="button"
+              onClick={() => toggleParticipant(member)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${participants.includes(member)
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+            >
+              {member}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-5">
         <label className="block text-sm font-semibold text-slate-700">Chi tiết chi phí</label>
-        
+
         {/* Court Fee */}
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Tiền sân</span>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={isPrepaid.court}
                   onChange={e => setIsPrepaid(prev => ({ ...prev, court: e.target.checked }))}
                   className="w-4 h-4 rounded text-indigo-600"
                 /> Trả trước
               </label>
-              <PayerSelect value={payers.court} onChange={(v) => setPayers(p => ({...p, court: v}))} />
+              <PayerSelect value={payers.court} onChange={(v) => setPayers(p => ({ ...p, court: v }))} />
             </div>
           </div>
-          <input 
-            type="number" 
+          <input
+            type="number"
             placeholder="0"
-            value={court || ''} 
+            value={court || ''}
             onChange={e => setCourt(Number(e.target.value))}
             className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-900 text-lg font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
@@ -88,20 +122,20 @@ const SessionForm: React.FC<Props> = ({ initialData, members, onSubmit }) => {
             <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Tiền nước</span>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={isPrepaid.water}
                   onChange={e => setIsPrepaid(prev => ({ ...prev, water: e.target.checked }))}
                   className="w-4 h-4 rounded text-indigo-600"
                 /> Trả trước
               </label>
-              <PayerSelect value={payers.water} onChange={(v) => setPayers(p => ({...p, water: v}))} />
+              <PayerSelect value={payers.water} onChange={(v) => setPayers(p => ({ ...p, water: v }))} />
             </div>
           </div>
-          <input 
-            type="number" 
+          <input
+            type="number"
             placeholder="0"
-            value={water || ''} 
+            value={water || ''}
             onChange={e => setWater(Number(e.target.value))}
             className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-900 text-lg font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
@@ -113,27 +147,27 @@ const SessionForm: React.FC<Props> = ({ initialData, members, onSubmit }) => {
             <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Tiền cầu</span>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={isPrepaid.shuttle}
                   onChange={e => setIsPrepaid(prev => ({ ...prev, shuttle: e.target.checked }))}
                   className="w-4 h-4 rounded text-indigo-600"
                 /> Trả trước
               </label>
-              <PayerSelect value={payers.shuttle} onChange={(v) => setPayers(p => ({...p, shuttle: v}))} />
+              <PayerSelect value={payers.shuttle} onChange={(v) => setPayers(p => ({ ...p, shuttle: v }))} />
             </div>
           </div>
-          <input 
-            type="number" 
+          <input
+            type="number"
             placeholder="0"
-            value={shuttle || ''} 
+            value={shuttle || ''}
             onChange={e => setShuttle(Number(e.target.value))}
             className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-900 text-lg font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
         </div>
       </div>
 
-      <button 
+      <button
         type="submit"
         className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all active:scale-[0.98] mt-4"
       >

@@ -4,7 +4,7 @@ import { AppState } from '../types';
 
 interface Props {
   data: AppState;
-  memberDebts: Record<string, number>;
+  memberBalances: Record<string, number>;
   aiAnalysis: string;
   isAnalyzing: boolean;
   onAddMember: (name: string) => void;
@@ -13,12 +13,12 @@ interface Props {
   setDbConfig: (config: any) => void;
 }
 
-const SummaryView: React.FC<Props> = ({ 
-  data, 
-  memberDebts, 
-  aiAnalysis, 
-  isAnalyzing, 
-  onAddMember, 
+const SummaryView: React.FC<Props> = ({
+  data,
+  memberBalances,
+  aiAnalysis,
+  isAnalyzing,
+  onAddMember,
   onRemoveMember,
   dbConfig,
   setDbConfig
@@ -26,7 +26,7 @@ const SummaryView: React.FC<Props> = ({
   const [newMemberName, setNewMemberName] = useState('');
   const [showDbSettings, setShowDbSettings] = useState(false);
   const latestSessions = data.sessions.slice(0, 3);
-  
+
   return (
     <div className="space-y-6">
       {/* AI Assistant */}
@@ -103,34 +103,34 @@ const SummaryView: React.FC<Props> = ({
         )}
       </div> */}
 
-      {/* Members & Debts */}
+      {/* Members & Balances */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <span className="text-lg">👥</span> Thành viên & Tiền nợ
+          <span className="text-lg">👥</span> Thành viên & Số dư cá nhân
         </h3>
         <div className="space-y-2 mb-6">
-          {(Object.entries(memberDebts) as [string, number][]).map(([name, amount]) => (
+          {(Object.entries(memberBalances) as [string, number][]).map(([name, amount]) => (
             <div key={name} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
               <div className="flex items-center gap-2">
                 <button onClick={() => onRemoveMember(name)} className="w-5 h-5 rounded-full bg-slate-50 text-slate-300 hover:text-red-400 flex items-center justify-center text-[10px]">✕</button>
                 <span className="text-sm font-medium text-slate-600">{name}</span>
               </div>
-              <span className={`text-sm font-bold ${amount > 0 ? 'text-orange-600' : 'text-slate-300'}`}>
-                {amount > 0 ? amount.toLocaleString() : '0'} VNĐ
+              <span className={`text-sm font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {amount >= 0 ? '+' : ''}{Math.round(amount).toLocaleString()} VNĐ
               </span>
             </div>
           ))}
         </div>
         <div className="flex gap-2">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Tên mới..."
             value={newMemberName}
             onChange={(e) => setNewMemberName(e.target.value)}
             className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none"
           />
-          <button 
-            onClick={() => { if(newMemberName) onAddMember(newMemberName); setNewMemberName(''); }}
+          <button
+            onClick={() => { if (newMemberName) onAddMember(newMemberName); setNewMemberName(''); }}
             className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold active:scale-95 transition-transform"
           >+ Thêm</button>
         </div>
