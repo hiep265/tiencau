@@ -9,68 +9,57 @@ import TransactionList from './components/TransactionList';
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from '@supabase/supabase-js';
 
-const STORAGE_KEY = 'badminton_manager_data_v1';
-const DB_CONFIG_KEY = 'badminton_db_config';
 const INITIAL_MEMBERS = ['Hiệp', 'Tiến', 'Băng', 'Nhung'];
 
 const App: React.FC = () => {
   // --- STATE DỮ LIỆU ---
-  const [data, setData] = useState<AppState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.members) parsed.members = INITIAL_MEMBERS;
-      return parsed;
-    }
-    return { sessions: [], fundTransactions: [], members: INITIAL_MEMBERS };
-  });
+  const [data, setData] = useState<AppState>({ sessions: [], fundTransactions: [], members: INITIAL_MEMBERS });
 
   // --- STATE DATABASE ---
-  // Tự động lấy từ env nếu có, nếu không thì lấy từ localStorage
-  const [dbConfig, setDbConfig] = useState(() => {
-    const saved = localStorage.getItem(DB_CONFIG_KEY);
-    const parsed = saved ? JSON.parse(saved) : { url: '', key: '', groupId: 'my-badminton-group' };
-    
-    return {
-      url: parsed.url || (process.env.SUPABASE_URL || ''),
-      key: parsed.key || (process.env.SUPABASE_ANON_KEY || ''),
-      groupId: parsed.groupId || 'my-badminton-group'
-    };
-  });
-  
+  const [dbConfig, setDbConfig] = useState(() => ({
+    url: import.meta.env.VITE_SUPABASE_URL || '',
+    key: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    groupId: 'my-badminton-group'
+  }));
+
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success'>('idle');
 
   // Khởi tạo Supabase client
   const supabase = useMemo(() => {
+    console.log('Creating Supabase client...', { url: !!dbConfig.url, key: !!dbConfig.key });
     if (dbConfig.url && dbConfig.key) {
       try {
-        return createClient(dbConfig.url, dbConfig.key);
+        const client = createClient(dbConfig.url, dbConfig.key);
+        console.log('Supabase client created successfully');
+        return client;
       } catch (e) {
         console.error("Supabase Init Error:", e);
         return null;
       }
     }
+    console.log('Supabase not configured - missing url or key');
     return null;
   }, [dbConfig.url, dbConfig.key]);
 
   // --- SYNC LOGIC ---
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
-
-  useEffect(() => {
-    localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(dbConfig));
-  }, [dbConfig]);
-
   const pushToCloud = useCallback(async (latestData: AppState) => {
-    if (!supabase || !dbConfig.groupId) return;
+    console.log('pushToCloud called', { supabase: !!supabase, dbConfig });
+    if (!supabase || !dbConfig.groupId) {
+      console.warn('Supabase not configured, skipping push');
+      return;
+    }
     setSyncStatus('syncing');
     try {
+      console.log('Pushing to Supabase...', dbConfig.groupId);
       const { error } = await supabase
         .from('badminton_sync')
         .upsert({ id: dbConfig.groupId, data: latestData, updated_at: new Date() });
-      
-      if (error) throw error;
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      console.log('Push success!');
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {
@@ -88,9 +77,9 @@ const App: React.FC = () => {
         .select('data')
         .eq('id', dbConfig.groupId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') throw error;
-      
+
       if (cloudData) {
         setData(cloudData.data);
         setSyncStatus('success');
@@ -144,9 +133,13 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // --- ACTIONS ---
-  const updateAndSync = (newData: AppState) => {
+  const updateAndSync = async (newData: AppState) => {
     setData(newData);
-    pushToCloud(newData);
+    if (!supabase || !dbConfig.groupId) {
+      console.warn('Supabase not configured, data only saved locally');
+      return;
+    }
+    await pushToCloud(newData);
   };
 
   const addMember = (name: string) => {
@@ -163,10 +156,11 @@ const App: React.FC = () => {
 
   const addSession = (session: BadmintonSession) => {
     let totalCashOut = 0;
-    if (session.payers.court === 'Quỹ' && !session.isPrepaid.court) totalCashOut += session.costs.court;
-    if (session.payers.water === 'Quỹ' && !session.isPrepaid.water) totalCashOut += session.costs.water;
-    if (session.payers.shuttle === 'Quỹ' && !session.isPrepaid.shuttle) totalCashOut += session.costs.shuttle;
-    
+    // Trừ quỹ nếu: check "Trả trước" HOẶC chọn payer là "Quỹ"
+    if (session.payers.court === 'Quỹ' || session.isPrepaid.court) totalCashOut += session.costs.court;
+    if (session.payers.water === 'Quỹ' || session.isPrepaid.water) totalCashOut += session.costs.water;
+    if (session.payers.shuttle === 'Quỹ' || session.isPrepaid.shuttle) totalCashOut += session.costs.shuttle;
+
     const newTx: FundTransaction[] = totalCashOut > 0 ? [{
       id: `tx-session-${session.id}`,
       date: session.date,
@@ -209,13 +203,13 @@ const App: React.FC = () => {
 
   // Fix: Initialized GoogleGenAI correctly and used setAiAnalysis/setIsAnalyzing
   const analyzeWithAI = async () => {
-    if (!process.env.API_KEY) {
-      setAiAnalysis("Vui lòng cấu hình API_KEY trong biến môi trường để dùng tính năng này.");
+    if (!import.meta.env.VITE_API_KEY) {
+      setAiAnalysis("Vui lòng cấu hình VITE_API_KEY trong biến môi trường để dùng tính năng này.");
       return;
     }
     setIsAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
       const prompt = `Phân tích quỹ cầu lông: Quỹ ${totalFund.toLocaleString()} VNĐ, Nợ: ${JSON.stringify(memberDebts)}. Trả lời vui vẻ, ngắn gọn bằng tiếng Việt.`;
       const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
       setAiAnalysis(response.text || 'Không có phản hồi.');
@@ -228,11 +222,10 @@ const App: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight">Badminton Master</h1>
-            <div className={`w-2 h-2 rounded-full ${
-              syncStatus === 'syncing' ? 'bg-yellow-400 animate-pulse' : 
-              syncStatus === 'error' ? 'bg-red-500' : 
-              syncStatus === 'success' ? 'bg-green-400 sync-active' : 'bg-white/20'
-            }`} title="Trạng thái đồng bộ" />
+            <div className={`w-2 h-2 rounded-full ${syncStatus === 'syncing' ? 'bg-yellow-400 animate-pulse' :
+              syncStatus === 'error' ? 'bg-red-500' :
+                syncStatus === 'success' ? 'bg-green-400 sync-active' : 'bg-white/20'
+              }`} title="Trạng thái đồng bộ" />
           </div>
           <div className="flex gap-2">
             <button onClick={pullFromCloud} title="Tải dữ liệu mới nhất" className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-90 transition-transform">🔄</button>
@@ -247,11 +240,11 @@ const App: React.FC = () => {
 
       <main className="p-4 mt-2">
         {activeTab === 'summary' && (
-          <SummaryView 
-            data={data} 
+          <SummaryView
+            data={data}
             memberDebts={memberDebts}
-            aiAnalysis={aiAnalysis} 
-            isAnalyzing={isAnalyzing} 
+            aiAnalysis={aiAnalysis}
+            isAnalyzing={isAnalyzing}
             onAddMember={addMember}
             onRemoveMember={removeMember}
             dbConfig={dbConfig}

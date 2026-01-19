@@ -50,7 +50,7 @@ const SummaryView: React.FC<Props> = ({
       </div>
 
       {/* Cloud Settings */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      {/* <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <button 
           onClick={() => setShowDbSettings(!showDbSettings)}
           className="w-full flex justify-between items-center font-bold text-slate-800"
@@ -101,7 +101,7 @@ const SummaryView: React.FC<Props> = ({
             </div>
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* Members & Debts */}
       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
