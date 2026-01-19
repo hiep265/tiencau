@@ -1,0 +1,5 @@
+{
+  "name": "Badminton Budget Master",
+  "description": "Ứng dụng quản lý chi tiêu và quỹ cầu lông dành cho nhóm 4 người (Hiệp, Tiến, Băng, Nhung) với tính năng theo dõi tiền sân, tiền cầu, tiền nước và quản lý khoản trả trước.",
+  "requestFramePermissions": []
+}
